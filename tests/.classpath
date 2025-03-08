@@ -12,9 +12,8 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/tradefederation"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/ddmlib"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/tradefederation-contrib"/>
-	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/external/mockito/mockito-byte-buddy-agent/linux_glibc_common/combined/mockito-byte-buddy-agent.jar"/>
-	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/external/mockito/mockito-byte-buddy/linux_glibc_common/combined/mockito-byte-buddy.jar"/>
+	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/external/mockito/mockito/linux_glibc_common/combined/mockito.jar"/>
 	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/tools/tradefederation/core/tradefed-protos/linux_glibc_common/combined/tradefed-protos.jar"/>
-	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/external/guava/guava-jre/linux_glibc_common/combined/guava-jre.jar"/>
+	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/external/guava/guava/linux_glibc_common/combined/guava.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

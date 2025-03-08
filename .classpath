@@ -10,7 +10,7 @@
 	<classpathentry combineaccessrules="false" kind="src" path="/tradefederation"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/loganalysis"/>
 	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/tools/tradefederation/core/tradefed-protos/linux_glibc_common/combined/tradefed-protos.jar"/>
-	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/external/guava/guava-jre/linux_glibc_common/combined/guava-jre.jar"/>
-	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/external/protobuf/libprotobuf-java-full/linux_glibc_common/javac/classes"/>
+	<classpathentry kind="var" path="TRADEFED_ROOT/out/soong/.intermediates/external/guava/guava/linux_glibc_common/combined/guava.jar"/>
+	<classpathentry kind="var" path="TRADEFED_ROOT/out/host/linux-x86/framework/libprotobuf-java-full.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
