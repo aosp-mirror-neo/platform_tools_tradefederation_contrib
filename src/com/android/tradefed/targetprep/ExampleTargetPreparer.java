@@ -15,8 +15,8 @@
  */
 package com.android.tradefed.targetprep;
 
-import com.android.ddmlib.Log;
 import com.android.tradefed.invoker.TestInformation;
+import com.android.tradefed.log.Log;
 
 /**
  * Placeholder empty implementation of a {@link com.android.tradefed.targetprep.ITargetPreparer}.
