@@ -41,9 +41,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** A {@link ITargetPreparer} that generate heap profile for perfetto config */
-@OptionClass(alias = "perfetto-heap-config")
-public class PerfettoHeapConfigTargetPreparer extends BaseTargetPreparer {
+/** A {@link ITargetPreparer} that generate perfetto config */
+@OptionClass(alias = "perfetto-config")
+public class PerfettoConfigTargetPreparer extends BaseTargetPreparer {
 
     @Option(
             name = "trace-tool-name",
@@ -56,6 +56,11 @@ public class PerfettoHeapConfigTargetPreparer extends BaseTargetPreparer {
                     "Key is a original perfetto trace config file name before modification. Value"
                         + " is the complete device path to push the perfetto trace config file.")
     private Map<String, String> mPushFiles = new HashMap<>();
+
+    @Option(
+            name = "debug-trace-config-file",
+            description = "Path to the perfetto configuration file which is used for debugging.")
+    private String mDebugTraceFile = "cpu_trace_config.textproto";
 
     @Option(
             name = "process-names-to-profile",
@@ -91,7 +96,6 @@ public class PerfettoHeapConfigTargetPreparer extends BaseTargetPreparer {
     private String mSamplingInterval = "16384";
 
     private Map<String, File> mTestArtifactFilePathMap = new HashMap<>();
-    private File mTraceToolFile = null;
     private String mModuleName = null;
     private IAbi mAbi;
 
@@ -99,31 +103,101 @@ public class PerfettoHeapConfigTargetPreparer extends BaseTargetPreparer {
     @Override
     public void setUp(TestInformation testInfo)
             throws TargetSetupError, DeviceNotAvailableException {
-        // Get trace tool
-        if (mTraceToolFile == null || !mTraceToolFile.exists()) {
-            mTraceToolFile = getFileFromTestArtifacts(testInfo.getBuildInfo(), mTraceToolName);
-        }
-        if (!mPushFiles.isEmpty()) {
-            for (String pushFile : mPushFiles.keySet()) {
-                // Get trace config file from artifacts
-                File srcFile = getFileFromTestArtifacts(testInfo.getBuildInfo(), pushFile);
-                final String patchedFileContents = updateTraceConfig(srcFile);
-                pushString(testInfo.getDevice(), patchedFileContents, mPushFiles.get(pushFile));
-            }
-        } else {
+        if (mPushFiles.isEmpty()) {
             CLog.i(
-                    "update-push-trace-config-file is not set. PerfettoHeapConfigTargetPreparer did"
+                    "update-push-trace-config-file is not set. PerfettoConfigTargetPreparer did"
                             + " nothing.");
+            return;
         }
+        for (String pushFile : mPushFiles.keySet()) {
+            // Get trace config file from artifacts
+            final File srcFile = getFileFromTestArtifacts(testInfo.getBuildInfo(), pushFile);
+            switch (mTraceToolName) {
+                case "heap_profile":
+                    final String updatedHeapFileContents = updateHeapTraceConfig(testInfo, srcFile);
+                    pushString(
+                            testInfo.getDevice(),
+                            updatedHeapFileContents,
+                            mPushFiles.get(pushFile));
+                    break;
+                case "cpu_profile":
+                    final String updatedCpuFileContents = updateDebugTraceConfig(testInfo, srcFile);
+                    pushString(
+                            testInfo.getDevice(), updatedCpuFileContents, mPushFiles.get(pushFile));
+                    break;
+            }
+        }
+    }
+
+    /**
+     * Update the debug trace config file by replacing the PROCESS_NAME with the process names
+     * specified by the user, and append the cpu data sources to the original trace config file.
+     *
+     * @param testInfo the test information.
+     * @param srcFile the original trace config file.
+     * @return the updated trace config file content.
+     * @throws DeviceNotAvailableException if the device is not available.
+     */
+    private String updateDebugTraceConfig(TestInformation testInfo, File srcFile)
+            throws DeviceNotAvailableException {
+        final String dataSources;
+        final File debugTraceFile =
+                getFileFromTestArtifacts(testInfo.getBuildInfo(), mDebugTraceFile);
+        if (debugTraceFile == null || !debugTraceFile.exists()) {
+            CLog.w("Cannot find CPU trace config file %s.", mDebugTraceFile);
+            return null;
+        }
+        try {
+            String debugTraceFileContent = FileUtil.readStringFromFile(debugTraceFile);
+            String rawDataSources = debugTraceFileContent.replace("PROCESS_NAME", mProcessNames);
+            CLog.i(String.format("CPU data sources (raw): %s", rawDataSources));
+            dataSources = filterCommentLines(rawDataSources);
+        } catch (IOException e) {
+            CLog.e(
+                    String.format(
+                            "Unable to read CPU trace config file %s",
+                            debugTraceFile.getAbsolutePath()),
+                    e);
+            return null;
+        }
+
+        CLog.i(String.format("CPU data sources (filtered): %s", dataSources));
+        String originalContent;
+        try {
+            originalContent = FileUtil.readStringFromFile(srcFile);
+            CLog.i(String.format("Original file content: %s", originalContent));
+        } catch (IOException e) {
+            CLog.e(
+                    String.format(
+                            "Unable to read original config file %s", srcFile.getAbsolutePath()),
+                    e);
+            return null;
+        }
+        if (originalContent.contains("name: \"linux.perf\"")) {
+            int start =
+                    originalContent.indexOf(
+                            "data_sources: {\n        config {\n          name: \"linux.perf\"");
+            // int end = originalContent.indexOf("}\n}", start);
+            if (start != -1) {
+                final String updatedContent = originalContent.substring(0, start) + dataSources;
+                // + originalContent.substring(end - 1);
+                CLog.i(String.format("Updated file content: %s", updatedContent));
+                return updatedContent;
+            }
+        }
+        return null;
     }
 
     /**
      * Using heap_profile tool to update perfetto trace config. heap_profile cmdline doc:
      * https://perfetto.dev/docs/reference/heap_profile-cli
      */
-    private String updateTraceConfig(File srcFile) {
+    private String updateHeapTraceConfig(TestInformation testInfo, File srcFile) {
+        // Get heap_profile - record heap profile on Android device
+        File traceToolFile = getFileFromTestArtifacts(testInfo.getBuildInfo(), mTraceToolName);
+
         List<String> commandArgsList = new ArrayList<String>();
-        commandArgsList.add(mTraceToolFile.getAbsolutePath());
+        commandArgsList.add(traceToolFile.getAbsolutePath());
         commandArgsList.add("--print-config");
         if (!mProcessNames.isEmpty()) {
             commandArgsList.add("--name");
@@ -148,18 +222,18 @@ public class PerfettoHeapConfigTargetPreparer extends BaseTargetPreparer {
             commandArgsList.add("--no-startup");
         }
 
-        CLog.i("Run the heap_profile to get a new perfetto config data_sources.");
-        CommandResult result =
-                runHostCommand(
-                        10000,
-                        commandArgsList.toArray(new String[commandArgsList.size()]),
-                        null,
-                        null);
-        CLog.i(String.format("Command result status = %s", result.getStatus()));
+        final String[] command = commandArgsList.toArray(new String[commandArgsList.size()]);
+        CLog.i(
+                String.format(
+                        "Perfetto data_sources generation command: %s", String.join(" ", command)));
+
+        CommandResult result = runHostCommand(10000, command, null, null);
+        CLog.i(String.format("Command result status: %s", result.getStatus()));
+
         if (CommandStatus.SUCCESS.equals(result.getStatus())) {
-            CLog.i(String.format("Command result = %s", result.getStdout()));
+            CLog.i(String.format("Original result: %s", result.getStdout()));
             String dataSourcesToAppend = extractDataSources(result.getStdout());
-            CLog.i(String.format("Data sources to append = %s", dataSourcesToAppend));
+            CLog.i(String.format("Modified result to append: %s", dataSourcesToAppend));
 
             String originalContent;
             try {
@@ -172,7 +246,7 @@ public class PerfettoHeapConfigTargetPreparer extends BaseTargetPreparer {
                         e);
                 return null;
             }
-
+            // Append the modified data_sources to the original config file content.
             return originalContent + "\n" + dataSourcesToAppend;
         } else {
             CLog.e("Fail to run heap_profile command");
@@ -181,12 +255,17 @@ public class PerfettoHeapConfigTargetPreparer extends BaseTargetPreparer {
         return null;
     }
 
+    /**
+     * Push the updated trace config file to the device.
+     *
+     * @param device the device to push to.
+     * @param src the source string.
+     * @param remotePath the remote path to push to.
+     */
     private void pushString(ITestDevice device, String src, String remotePath)
             throws DeviceNotAvailableException {
         if (!device.pushString(src, remotePath)) {
-            CLog.e(
-                    String.format(
-                            "Failed to push a string to remote '%s'", remotePath));
+            CLog.e(String.format("Failed to push a string to remote '%s'", remotePath));
         }
     }
 
@@ -226,10 +305,32 @@ public class PerfettoHeapConfigTargetPreparer extends BaseTargetPreparer {
     }
 
     /**
+     * Filters out lines that are comments (start with // after trimming) or are empty.
+     *
+     * @param input The string containing lines to filter.
+     * @return A new string with comment and empty lines removed.
+     */
+    private String filterCommentLines(String input) {
+        StringBuilder sb = new StringBuilder();
+        for (String line : input.split("\n")) {
+            String trimmedLine = line.trim();
+            if (!(trimmedLine.startsWith("//")
+                            || trimmedLine.startsWith("#")
+                            || trimmedLine.startsWith("--")
+                            || trimmedLine.startsWith("/*")
+                            || trimmedLine.startsWith("*"))
+                    && !trimmedLine.isEmpty()) {
+                sb.append(line).append("\n");
+            }
+        }
+        return sb.toString()
+                .trim(); // Trim to remove any trailing newline if the last line was kept
+    }
+
+    /**
      * Retrieve the file from the test artifacts or module artifacts and cache it in a map for the
      * subsequent calls.
      *
-     * @param fileName name of the file to look up in the artifacts.
      * @return File from the test artifact or module artifact. Returns null if file is not found.
      */
     public File getFileFromTestArtifacts(IBuildInfo buildInfo, String fileName) {
@@ -263,6 +364,12 @@ public class PerfettoHeapConfigTargetPreparer extends BaseTargetPreparer {
         if (buildInfo instanceof IDeviceBuildInfo) {
             IDeviceBuildInfo deviceBuild = (IDeviceBuildInfo) buildInfo;
             File testDir = deviceBuild.getTestsDir();
+            if (testDir != null) {
+                File f = new File(testDir, fileName);
+                if (f.exists()) {
+                    return f;
+                }
+            }
             List<File> scanDirs = new ArrayList<>();
             // If it exists, always look first in the ANDROID_TARGET_OUT_TESTCASES
             File targetTestCases = deviceBuild.getFile(BuildInfoFileKey.TARGET_LINKED_DIR);
