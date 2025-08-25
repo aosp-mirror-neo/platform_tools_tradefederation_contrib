@@ -24,9 +24,12 @@ import com.android.tradefed.log.LogUtil.CLog;
 import com.android.tradefed.targetprep.BaseTargetPreparer;
 import com.android.tradefed.targetprep.TargetSetupError;
 
+import com.google.common.base.Splitter;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.stream.Collectors;
 
 /** A {@link ITargetPreparer} that generate Java heap profile for perfetto config */
 @OptionClass(alias = "perfetto-java-heap-config")
@@ -89,7 +92,19 @@ public class PerfettoJavaHeapConfigTargetPreparer extends BaseTargetPreparer {
         }
     }
 
+    private String generateProcessCmdlines(String processNames) {
+        // Split the string by commas, trim whitespace from each result,
+        // and omit any empty strings.
+        return Splitter.on(',')
+                .trimResults()
+                .omitEmptyStrings()
+                .splitToStream(processNames)
+                .map(trimmedProcess -> "      process_cmdline: \"" + trimmedProcess + "\"\n")
+                .collect(Collectors.joining());
+    }
+
     private String generateConfig(String processNames, int bufferSizeKb) {
+        String processCmdlines = generateProcessCmdlines(processNames);
         return "buffers {\n"
                 + "  size_kb: "
                 + bufferSizeKb
@@ -101,9 +116,7 @@ public class PerfettoJavaHeapConfigTargetPreparer extends BaseTargetPreparer {
                 + "  config {\n"
                 + "    name: \"android.java_hprof\"\n"
                 + "    java_hprof_config {\n"
-                + "      process_cmdline: \""
-                + processNames
-                + "\"\n"
+                + processCmdlines
                 + "      dump_smaps: true\n"
                 + "    }\n"
                 + "  }\n"
