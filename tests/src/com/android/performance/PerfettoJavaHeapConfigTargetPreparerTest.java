@@ -136,6 +136,86 @@ public class PerfettoJavaHeapConfigTargetPreparerTest {
                         + "}");
     }
 
+    @Test
+    public void testMultipleProcessNames_pushesConfigWithMultipleProcessNames()
+            throws ConfigurationException {
+        // Verifies that a comma-separated list of process names is correctly parsed and added to
+        // the config. This also tests that whitespace around names is trimmed.
+        new OptionSetter(mPreparer)
+                .setOptionValue(
+                        "process-names-to-profile",
+                        " com.android.systemui, com.google.android.apps.nexuslauncher ");
+
+        runPreparer();
+
+        assertOneFilePushed(
+                "/data/misc/perfetto-traces/trace_config_java_heap.textproto",
+                "buffers {\n"
+                        + "  size_kb: 256000\n"
+                        + "  fill_policy: DISCARD\n"
+                        + "}\n"
+                        + "\n"
+                        + "data_sources {\n"
+                        + "  config {\n"
+                        + "    name: \"android.java_hprof\"\n"
+                        + "    java_hprof_config {\n"
+                        + "      process_cmdline: \"com.android.systemui\"\n"
+                        + "      process_cmdline: \"com.google.android.apps.nexuslauncher\"\n"
+                        + "      dump_smaps: true\n"
+                        + "    }\n"
+
+                        + "  }\n"
+                        + "}\n"
+                        + "\n"
+                        + "data_source_stop_timeout_ms: 100000\n"
+                        + "data_sources: {\n"
+                        + "  config {\n"
+                        + "    name: \"linux.process_stats\"\n"
+                        + "    process_stats_config {\n"
+                        + "      scan_all_processes_on_start: true\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}");
+    }
+
+    @Test
+    public void testProcessNamesWithEmptyEntries_pushesConfigOmittingEmptyEntries()
+            throws ConfigurationException {
+        // Verifies that empty entries in the process name list are ignored.
+        new OptionSetter(mPreparer)
+                .setOptionValue("process-names-to-profile", "com.android.systemui,,com.other,");
+
+        runPreparer();
+
+        assertOneFilePushed(
+                "/data/misc/perfetto-traces/trace_config_java_heap.textproto",
+                "buffers {\n"
+                        + "  size_kb: 256000\n"
+                        + "  fill_policy: DISCARD\n"
+                        + "}\n"
+                        + "\n"
+                        + "data_sources {\n"
+                        + "  config {\n"
+                        + "    name: \"android.java_hprof\"\n"
+                        + "    java_hprof_config {\n"
+                        + "      process_cmdline: \"com.android.systemui\"\n"
+                        + "      process_cmdline: \"com.other\"\n"
+                        + "      dump_smaps: true\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "\n"
+                        + "data_source_stop_timeout_ms: 100000\n"
+                        + "data_sources: {\n"
+                        + "  config {\n"
+                        + "    name: \"linux.process_stats\"\n"
+                        + "    process_stats_config {\n"
+                        + "      scan_all_processes_on_start: true\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}");
+    }
+
     private void runPreparer() {
         final TestInformation testInformation = mock(TestInformation.class);
         when(testInformation.getDevice()).thenReturn(mITestDevice);
