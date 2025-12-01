@@ -58,11 +58,6 @@ public class PerfettoConfigTargetPreparer extends BaseTargetPreparer {
     private Map<String, String> mPushFiles = new HashMap<>();
 
     @Option(
-            name = "debug-trace-config-file",
-            description = "Path to the perfetto configuration file which is used for debugging.")
-    private String mDebugTraceFile = "cpu_trace_config.textproto";
-
-    @Option(
             name = "process-names-to-profile",
             description = "Comma-separated list of process names to profile.")
     private String mProcessNames = "com.android.systemui";
@@ -130,8 +125,8 @@ public class PerfettoConfigTargetPreparer extends BaseTargetPreparer {
     }
 
     /**
-     * Update the debug trace config file by replacing the PROCESS_NAME with the process names
-     * specified by the user, and append the cpu data sources to the original trace config file.
+     * Update the debug trace config file by appending the cpu data sources to the original trace
+     * config file.
      *
      * @param testInfo the test information.
      * @param srcFile the original trace config file.
@@ -140,28 +135,6 @@ public class PerfettoConfigTargetPreparer extends BaseTargetPreparer {
      */
     private String updateDebugTraceConfig(TestInformation testInfo, File srcFile)
             throws DeviceNotAvailableException {
-        final String dataSources;
-        final File debugTraceFile =
-                getFileFromTestArtifacts(testInfo.getBuildInfo(), mDebugTraceFile);
-        if (debugTraceFile == null || !debugTraceFile.exists()) {
-            CLog.w("Cannot find CPU trace config file %s.", mDebugTraceFile);
-            return null;
-        }
-        try {
-            String debugTraceFileContent = FileUtil.readStringFromFile(debugTraceFile);
-            String rawDataSources = debugTraceFileContent.replace("PROCESS_NAME", mProcessNames);
-            CLog.i(String.format("CPU data sources (raw): %s", rawDataSources));
-            dataSources = filterCommentLines(rawDataSources);
-        } catch (IOException e) {
-            CLog.e(
-                    String.format(
-                            "Unable to read CPU trace config file %s",
-                            debugTraceFile.getAbsolutePath()),
-                    e);
-            return null;
-        }
-
-        CLog.i(String.format("CPU data sources (filtered): %s", dataSources));
         String originalContent;
         try {
             originalContent = FileUtil.readStringFromFile(srcFile);
@@ -173,19 +146,34 @@ public class PerfettoConfigTargetPreparer extends BaseTargetPreparer {
                     e);
             return null;
         }
-        if (originalContent.contains("name: \"linux.perf\"")) {
-            int start =
-                    originalContent.indexOf(
-                            "data_sources: {\n        config {\n          name: \"linux.perf\"");
-            // int end = originalContent.indexOf("}\n}", start);
-            if (start != -1) {
-                final String updatedContent = originalContent.substring(0, start) + dataSources;
-                // + originalContent.substring(end - 1);
-                CLog.i(String.format("Updated file content: %s", updatedContent));
-                return updatedContent;
-            }
+        StringBuilder targetCmdlines = new StringBuilder();
+        for (String p : mProcessNames.split(",")) {
+            targetCmdlines.append(String.format("          target_cmdline: \"%s\"%n", p.trim()));
         }
-        return null;
+        String dataSourcesToAppend =
+                "data_sources {\n"
+                        + "  config {\n"
+                        + "    name: \"linux.perf\"\n"
+                        + "    target_buffer: 2\n"
+                        + "    perf_event_config {\n"
+                        + "      timebase {\n"
+                        + "        frequency: 200\n"
+                        + "        timestamp_clock: PERF_CLOCK_BOOTTIME\n"
+                        + "      }\n"
+                        + "      callstack_sampling {\n"
+                        + "        kernel_frames: true\n"
+                        + "        scope {\n"
+                        + targetCmdlines.toString()
+                        + "        }\n"
+                        + "      }\n"
+                        + "      max_daemon_memory_kb: 524288\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}";
+        // Append the data_sources to the original config file content.
+        final String updatedContent = originalContent + "\n" + dataSourcesToAppend;
+        CLog.i(String.format("Updated file content: %s", updatedContent));
+        return updatedContent;
     }
 
     /**
@@ -289,7 +277,7 @@ public class PerfettoConfigTargetPreparer extends BaseTargetPreparer {
                 result.append(line);
                 result.append("\n");
                 if (line.trim().contains("android.heapprofd")) {
-                    result.append("    target_buffer: 2");
+                    result.append(" target_buffer: 2");
                     result.append("\n");
                 }
             }
@@ -302,29 +290,6 @@ public class PerfettoConfigTargetPreparer extends BaseTargetPreparer {
             }
         }
         return result.toString();
-    }
-
-    /**
-     * Filters out lines that are comments (start with // after trimming) or are empty.
-     *
-     * @param input The string containing lines to filter.
-     * @return A new string with comment and empty lines removed.
-     */
-    private String filterCommentLines(String input) {
-        StringBuilder sb = new StringBuilder();
-        for (String line : input.split("\n")) {
-            String trimmedLine = line.trim();
-            if (!(trimmedLine.startsWith("//")
-                            || trimmedLine.startsWith("#")
-                            || trimmedLine.startsWith("--")
-                            || trimmedLine.startsWith("/*")
-                            || trimmedLine.startsWith("*"))
-                    && !trimmedLine.isEmpty()) {
-                sb.append(line).append("\n");
-            }
-        }
-        return sb.toString()
-                .trim(); // Trim to remove any trailing newline if the last line was kept
     }
 
     /**
