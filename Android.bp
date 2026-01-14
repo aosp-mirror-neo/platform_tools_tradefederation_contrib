@@ -21,6 +21,7 @@ tradefed_java_library_host {
     defaults: ["tradefed_errorprone_defaults"],
     // No extension of contrib is expected, it ships with Tradefed alone
     visibility: [
+        "//test/catbox/tools/catbox-tradefed",
         "//tools/tradefederation/contrib/tests",
         "//tools/tradefederation/core",
     ],
