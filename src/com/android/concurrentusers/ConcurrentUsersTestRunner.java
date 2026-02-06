@@ -49,6 +49,7 @@ import com.android.tradefed.testtype.InstrumentationTest;
 import com.google.common.annotations.VisibleForTesting;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -291,6 +292,23 @@ public class ConcurrentUsersTestRunner
                             mSubtest.getClass().getName()),
                     InfraErrorIdentifier.OPTION_CONFIGURATION_ERROR);
         }
+        CLog.d(
+                "Collecting tests for user %s. Include filters: %s, Exclude filters: %s, "
+                        + "Include annotations: %s, Exclude annotations: %s",
+                collectionUser,
+                mIncludeFilters,
+                mExcludeFilters,
+                mIncludeAnnotation,
+                mExcludeAnnotation);
+        if (collector instanceof ITestFilterReceiver) {
+            ((ITestFilterReceiver) collector).addAllIncludeFilters(mIncludeFilters);
+            ((ITestFilterReceiver) collector).addAllExcludeFilters(mExcludeFilters);
+        }
+        if (collector instanceof ITestAnnotationFilterReceiver) {
+            ((ITestAnnotationFilterReceiver) collector).addAllIncludeAnnotation(mIncludeAnnotation);
+            ((ITestAnnotationFilterReceiver) collector).addAllExcludeAnnotation(mExcludeAnnotation);
+        }
+
         CollectingTestListener collectionListener = new CollectingTestListener();
         ((ITestCollector) collector).setCollectTestsOnly(true);
 
@@ -315,9 +333,13 @@ public class ConcurrentUsersTestRunner
             throws DeviceNotAvailableException {
         long totalElapsedTime = 0;
         HashMap<String, Metric> totalMetrics = new HashMap<>();
+        CLog.d(
+                "Running %d tests concurrently on users %s",
+                allTests.size(), Arrays.toString(users));
         listener.testRunStarted(TEST_RUN_NAME, allTests.size());
 
         for (TestDescription test : allTests) {
+            CLog.d("Running test concurrently: %s", test);
             ExecutorService executor = Executors.newFixedThreadPool(users.length);
             List<CollectingTestListener> userListeners = new ArrayList<>();
             long testStartTime = System.currentTimeMillis();

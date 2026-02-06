@@ -299,4 +299,27 @@ public class ConcurrentUsersTestRunnerTest {
         inOrder.verify(mMockListener).testEnded(any(), anyLong(), mMetricCaptor.capture());
         inOrder.verify(mMockListener).testRunEnded(anyLong(), mMetricCaptor.capture());
     }
+
+    @Test
+    public void testCollectTests_propagatesFilters() throws Exception {
+        String includeFilter = "com.android.test.MyTest#test1";
+        String excludeFilter = "com.android.test.MyTest#test2";
+        String includeAnnotation = "android.test.annotation.MyAnnotation";
+        String excludeAnnotation = "android.test.annotation.ExcludeMe";
+
+        mRunner.addIncludeFilter(includeFilter);
+        mRunner.addExcludeFilter(excludeFilter);
+        mRunner.addIncludeAnnotation(includeAnnotation);
+        mRunner.addExcludeAnnotation(excludeAnnotation);
+
+        doReturn(mMockSubTest).when(mRunner).cloneSubTest();
+
+        mRunner.collectTests(mTestInfo, "10");
+
+        verify(mMockSubTest).addAllIncludeFilters(eq(mRunner.getIncludeFilters()));
+        verify(mMockSubTest).addAllExcludeFilters(eq(mRunner.getExcludeFilters()));
+        verify(mMockSubTest).addAllIncludeAnnotation(eq(mRunner.getIncludeAnnotations()));
+        verify(mMockSubTest).addAllExcludeAnnotation(eq(mRunner.getExcludeAnnotations()));
+        verify(mMockSubTest).setCollectTestsOnly(true);
+    }
 }
