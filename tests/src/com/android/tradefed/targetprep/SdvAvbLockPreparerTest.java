@@ -91,7 +91,6 @@ public class SdvAvbLockPreparerTest {
         inOrder.verify(mMockDevice).executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "erase", "userdata");
         inOrder.verify(mMockDevice).executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "erase", "metadata");
         inOrder.verify(mMockDevice).executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "flashing", "lock");
-        inOrder.verify(mMockDevice).reboot();
         inOrder.verify(mMockDevice).waitForDeviceAvailable(anyLong());
     }
 
@@ -209,7 +208,6 @@ public class SdvAvbLockPreparerTest {
                 .thenReturn(successResult);
         when(mMockDevice.executeFastbootCommand(anyLong(), eq("flashing"), eq("lock")))
                 .thenReturn(successResult);
-        doNothing().when(mMockDevice).reboot();
 
         // Run and expect DeviceNotAvailableException
         try {
@@ -229,7 +227,6 @@ public class SdvAvbLockPreparerTest {
                 .executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "erase", "metadata");
         inOrder.verify(mMockDevice)
                 .executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "flashing", "lock");
-        inOrder.verify(mMockDevice).reboot();
         inOrder.verify(mMockDevice).waitForDeviceAvailable(anyLong());
     }
 }
