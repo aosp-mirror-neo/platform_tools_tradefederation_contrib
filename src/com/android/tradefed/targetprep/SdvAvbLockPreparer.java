@@ -62,6 +62,12 @@ public class SdvAvbLockPreparer extends BaseTargetPreparer {
 
         ITestDevice device = testInfo.getDevice();
         String serial = device.getSerialNumber();
+
+        if (Objects.equals(device.getProperty("ro.boot.vbmeta.device_state"), "locked")) {
+            CLog.i("Device %s is already locked. Skipping SdvAvbLockPreparer.", serial);
+            return;
+        }
+
         CLog.i("Starting SDV AVB Lock process on device %s", serial);
 
         // adb wait-for-device
