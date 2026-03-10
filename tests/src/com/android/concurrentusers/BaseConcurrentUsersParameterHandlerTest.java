@@ -205,4 +205,25 @@ public class BaseConcurrentUsersParameterHandlerTest {
         assertThat(preparers).hasSize(1);
         assertThat(preparers.get(0)).isEqualTo(preparer);
     }
+
+    @Test
+    public void addParameterSpecificConfig_addsPreparerAtEnd() {
+        // Arrange
+        ITargetPreparer existingPreparer = new StubTargetPreparer();
+        List<ITargetPreparer> preparers = new ArrayList<>();
+        preparers.add(existingPreparer);
+        when(mMockModuleConfiguration.getTargetPreparers()).thenReturn(preparers);
+
+        ITargetPreparer newPreparer = new StubTargetPreparer();
+        setupHandler(newPreparer);
+
+        // Act
+        mHandler.addParameterSpecificConfig(mMockModuleConfiguration);
+
+        // Assert
+        // Verify both preparers are present and in the correct order
+        assertThat(preparers).hasSize(2);
+        assertThat(preparers.get(0)).isEqualTo(existingPreparer);
+        assertThat(preparers.get(1)).isEqualTo(newPreparer);
+    }
 }

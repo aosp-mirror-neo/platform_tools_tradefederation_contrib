@@ -64,8 +64,10 @@ public abstract class BaseConcurrentUsersParameterHandler implements IModulePara
             moduleConfiguration.setTest(concurrentRunner);
 
             ITargetPreparer preparer = getTargetPreparer();
-            // Add the preparer to the front of the list to ensure the user is created early.
-            moduleConfiguration.getTargetPreparers().add(0, preparer);
+            // Add the preparer to the end of the list to ensure it runs after the module's
+            // standard installers (e.g., SuiteApkInstaller). This allows it to identify
+            // installed packages and make them available for the visible background user.
+            moduleConfiguration.getTargetPreparers().add(preparer);
 
             CLog.i(
                     "Applied %s to module '%s'.",
