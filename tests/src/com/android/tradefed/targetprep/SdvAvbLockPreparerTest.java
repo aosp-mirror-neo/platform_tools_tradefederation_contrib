@@ -29,10 +29,6 @@ import com.android.tradefed.invoker.TestInformation;
 import com.android.tradefed.util.CommandResult;
 import com.android.tradefed.util.CommandStatus;
 
-import com.android.tradefed.targetprep.TargetSetupError;
-
-import com.android.tradefed.targetprep.SdvAvbLockPreparer;
-
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -57,11 +53,27 @@ public class SdvAvbLockPreparerTest {
     private static final long FASTBOOT_TIMEOUT_MS = 2 * 60 * 1000;
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
         // No more MockitoAnnotations.initMocks(this);
         mPreparer = new SdvAvbLockPreparer();
         when(mMockTestInfo.getDevice()).thenReturn(mMockDevice);
         when(mMockDevice.getSerialNumber()).thenReturn(DEVICE_SERIAL);
+        when(mMockDevice.getProperty("ro.boot.vbmeta.device_state")).thenReturn("unlocked");
+    }
+
+    /** Test that the preparer skips if the device is already locked. */
+    @Test
+    public void testSetUp_alreadyLocked() throws Exception {
+        when(mMockDevice.getProperty("ro.boot.vbmeta.device_state")).thenReturn("locked");
+
+        // Run the preparer
+        mPreparer.setUp(mMockTestInfo);
+
+        // Verify that no other methods were called on the device besides serial and property check
+        InOrder inOrder = inOrder(mMockDevice);
+        inOrder.verify(mMockDevice).getSerialNumber();
+        inOrder.verify(mMockDevice).getProperty("ro.boot.vbmeta.device_state");
+        inOrder.verifyNoMoreInteractions();
     }
 
     /** Test the happy path where all commands succeed. */
@@ -88,8 +100,10 @@ public class SdvAvbLockPreparerTest {
         InOrder inOrder = inOrder(mMockDevice);
         inOrder.verify(mMockDevice).waitForDeviceAvailable(anyLong());
         inOrder.verify(mMockDevice).rebootIntoBootloader();
-        inOrder.verify(mMockDevice).executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "erase", "userdata");
-        inOrder.verify(mMockDevice).executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "erase", "metadata");
+        inOrder.verify(mMockDevice)
+                .executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "erase", "userdata");
+        inOrder.verify(mMockDevice)
+                .executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "erase", "metadata");
         inOrder.verify(mMockDevice).executeFastbootCommand(FASTBOOT_TIMEOUT_MS, "flashing", "lock");
         inOrder.verify(mMockDevice).waitForDeviceAvailable(anyLong());
     }
