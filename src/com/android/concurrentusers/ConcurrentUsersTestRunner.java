@@ -83,7 +83,6 @@ public class ConcurrentUsersTestRunner
         implements ITestWrapper,
                 IDeviceTest,
                 IConfigurationReceiver,
-                ITestCollector,
                 IAbiReceiver,
                 IMetricCollectorReceiver,
                 ITestFilterReceiver,
@@ -105,7 +104,6 @@ public class ConcurrentUsersTestRunner
 
     private ITestDevice mDevice;
     private IConfiguration mConfiguration;
-    private boolean mCollectTestsOnly = false;
     private IAbi mAbi;
     private List<IMetricCollector> mMetricCollectors;
 
@@ -130,11 +128,6 @@ public class ConcurrentUsersTestRunner
     @Override
     public ITestDevice getDevice() {
         return mDevice;
-    }
-
-    @Override
-    public void setCollectTestsOnly(boolean shouldCollect) {
-        mCollectTestsOnly = shouldCollect;
     }
 
     @Override
@@ -248,11 +241,6 @@ public class ConcurrentUsersTestRunner
         }
 
         List<TestDescription> allTests = collectTests(testInfo, userIds.split(",")[0]);
-
-        if (mCollectTestsOnly) {
-            forwardCollectedTests(listener, allTests);
-            return;
-        }
 
         runTestsConcurrently(testInfo, listener, allTests, userIds.split(","));
     }
@@ -399,16 +387,6 @@ public class ConcurrentUsersTestRunner
 
     private static boolean shouldRunConcurrently(String userIds) {
         return userIds != null && userIds.contains(",");
-    }
-
-    private static void forwardCollectedTests(
-            ITestInvocationListener listener, List<TestDescription> allTests) {
-        listener.testRunStarted(TEST_RUN_NAME, allTests.size());
-        for (TestDescription test : allTests) {
-            listener.testStarted(test);
-            listener.testEnded(test, new HashMap<String, Metric>());
-        }
-        listener.testRunEnded(0, new HashMap<String, Metric>());
     }
 
     private static TestInformation createTestInfoForUser(TestInformation testInfo, String userId) {
